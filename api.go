@@ -98,18 +98,14 @@ func httpClient() *http.Client {
 }
 
 // Make a GET Graph API request and get the raw body byte slice.
-func GetRaw(path string, values ...Values) ([]byte, error) {
-	final := url.Values{}
-	for _, v := range values {
-		v.Set(final)
-	}
+func GetRaw(path string, values url.Values) ([]byte, error) {
 	const phpRFC3339 = `Y-m-d\TH:i:s\Z`
-	final.Set("date_format", phpRFC3339)
+	values.Set("date_format", phpRFC3339)
 	u := &fburl.URL{
 		Scheme:    "https",
 		SubDomain: fburl.DGraph,
 		Path:      path,
-		Values:    final,
+		Values:    values,
 	}
 	resp, err := httpClient().Get(u.String())
 	if err != nil {
@@ -138,7 +134,11 @@ func GetRaw(path string, values ...Values) ([]byte, error) {
 
 // Make a GET Graph API request.
 func Get(result interface{}, path string, values ...Values) error {
-	b, err := GetRaw(path, values...)
+	final := url.Values{}
+	for _, v := range values {
+		v.Set(final)
+	}
+	b, err := GetRaw(path, final)
 	if err != nil {
 		return err
 	}
