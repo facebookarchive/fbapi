@@ -10,13 +10,21 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
+const redactedStub = "$1=-- XX -- REDACTED -- XX --"
+
 var (
 	insecureSSL = flag.Bool(
 		"fbapi.insecure", false, "Skip SSL certificate validation.")
+	redact = flag.Bool(
+		"fbapi.redact",
+		true,
+		"When true known sensitive information will be stripped from errors.")
+	cleanURLRegExp  = regexp.MustCompile("(access_token|client_secret)=([^&]*)")
 	httpClientCache *http.Client
 )
 
@@ -97,6 +105,14 @@ func httpClient() *http.Client {
 	return httpClientCache
 }
 
+// remove known sensitive tokens from data
+func cleanURL(url string) string {
+	if *redact {
+		return cleanURLRegExp.ReplaceAllString(url, redactedStub)
+	}
+	return url
+}
+
 // Make a GET Graph API request and get the raw body byte slice.
 func GetRaw(path string, values url.Values) ([]byte, error) {
 	const phpRFC3339 = `Y-m-d\TH:i:s\Z`
@@ -110,7 +126,7 @@ func GetRaw(path string, values url.Values) ([]byte, error) {
 	resp, err := httpClient().Get(u.String())
 	if err != nil {
 		return nil, fmt.Errorf(
-			"Request for URL %s failed with error %s.", u.String(), err)
+			"Request for URL %s failed with error %s.", cleanURL(u.String()), err)
 	}
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
@@ -118,7 +134,7 @@ func GetRaw(path string, values url.Values) ([]byte, error) {
 		return nil, fmt.Errorf(
 			"Request for URL %s failed because body could not be read "+
 				"with error %s.",
-			u.String(), err)
+			cleanURL(u.String()), err)
 	}
 	if resp.StatusCode > 399 || resp.StatusCode < 200 {
 		apiError := &errorResponse{Error{Body: b}}
