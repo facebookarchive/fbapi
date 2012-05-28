@@ -163,7 +163,7 @@ func Get(result interface{}, path string, values ...Values) error {
 		return fmt.Errorf(
 			"Request for path %s with response %s failed with "+
 				"json.Unmarshal error %s.",
-			path, string(b), err)
+			cleanURL(path), string(b), err)
 	}
 	return nil
 }
