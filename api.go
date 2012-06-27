@@ -7,12 +7,14 @@ import (
 	"flag"
 	"fmt"
 	"github.com/nshah/go.fburl"
+	"github.com/nshah/go.httpcontrol"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const redactedStub = "$1=-- XX -- REDACTED -- XX --"
@@ -24,6 +26,14 @@ var (
 		"fbapi.redact",
 		true,
 		"When true known sensitive information will be stripped from errors.")
+	timeout = flag.Duration(
+		"fbapi.timeout",
+		5*time.Second,
+		"Timeout for http requests.")
+	maxTries = flag.Uint(
+		"fbapi.max-tries",
+		3,
+		"Number of retries for known safe to retry calls.")
 	cleanURLRegExp  = regexp.MustCompile("(access_token|client_secret)=([^&]*)")
 	httpClientCache *http.Client
 )
@@ -94,12 +104,15 @@ func (e *Error) Error() string {
 // Disable SSL cert, useful when debugging or hitting internal self-signed certs
 func httpClient() *http.Client {
 	if httpClientCache == nil {
-		transport := &http.Transport{
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
-		}
 		httpClientCache = &http.Client{
-			Transport: transport,
+			Transport: &httpcontrol.Control{
+				Transport: &http.Transport{
+					Proxy:           http.ProxyFromEnvironment,
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
+				},
+				Timeout:  *timeout,
+				MaxTries: *maxTries,
+			},
 		}
 	}
 	return httpClientCache
