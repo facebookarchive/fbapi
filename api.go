@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/daaku/go.fburl"
-	"github.com/daaku/go.httpcontrol"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -15,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/daaku/go.fburl"
+	"github.com/daaku/go.httpcontrol"
 )
 
 const redactedStub = "$1=-- XX -- REDACTED -- XX --"
