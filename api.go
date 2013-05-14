@@ -105,13 +105,11 @@ func (e *Error) Error() string {
 func httpClient() *http.Client {
 	if httpClientCache == nil {
 		httpClientCache = &http.Client{
-			Transport: &httpcontrol.Control{
-				Transport: &http.Transport{
-					Proxy:           http.ProxyFromEnvironment,
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
-				},
-				Timeout:  *timeout,
-				MaxTries: *maxTries,
+			Transport: &httpcontrol.Transport{
+				Proxy:           http.ProxyFromEnvironment,
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
+				RequestTimeout:  *timeout,
+				MaxTries:        *maxTries,
 			},
 		}
 	}
