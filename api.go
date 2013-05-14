@@ -104,14 +104,14 @@ func (e *Error) Error() string {
 // Disable SSL cert, useful when debugging or hitting internal self-signed certs
 func httpClient() *http.Client {
 	if httpClientCache == nil {
-		httpClientCache = &http.Client{
-			Transport: &httpcontrol.Transport{
-				Proxy:           http.ProxyFromEnvironment,
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
-				RequestTimeout:  *timeout,
-				MaxTries:        *maxTries,
-			},
+		transport := &httpcontrol.Transport{
+			Proxy:           http.ProxyFromEnvironment,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecureSSL},
+			RequestTimeout:  *timeout,
+			MaxTries:        *maxTries,
 		}
+		transport.Start()
+		httpClientCache = &http.Client{Transport: transport}
 	}
 	return httpClientCache
 }
