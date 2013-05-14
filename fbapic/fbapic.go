@@ -29,6 +29,7 @@ type Cache struct {
 	Stats     Stats         // stats implementation
 	Prefix    string        // cache key prefix
 	Timeout   time.Duration // per value timeout
+	Client    *fbapi.Client // Facebook API Client
 }
 
 // Make a GET Graph API request.
@@ -49,7 +50,7 @@ func (c *Cache) Get(result interface{}, path string, values ...fbapi.Values) err
 			v.Set(final)
 		}
 		start := time.Now()
-		raw, err = fbapi.GetRaw(path, final)
+		raw, err = c.Client.GetRaw(path, final)
 		if err != nil {
 			c.Stats.Inc("fbapic graph api error")
 			c.Stats.Inc("fbapic graph api error " + c.Prefix)
