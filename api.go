@@ -39,30 +39,10 @@ var (
 	httpClientCache *http.Client
 )
 
-// An Error from the API.
-type Error struct {
-	Message string `json:"message"`
-	Type    string `json:"type"`
-	Code    int    `json:"code"`
-	Body    []byte
-}
-
-// Wrapper for "error"
-type errorResponse struct {
-	Error Error `json:"error"`
-}
-
 // Represents a thing that wants to modify the url.Values.
 type Values interface {
 	Set(url.Values)
 }
-
-// Represents an "access_token" for the Facebook API.
-type Token string
-
-const (
-	PublicToken = Token("")
-)
 
 // Generic Page options for list type queries.
 type Page struct {
@@ -90,11 +70,29 @@ func (fields Fields) Set(values url.Values) {
 	}
 }
 
+// Represents an "access_token" for the Facebook API.
+type Token string
+
+const PublicToken = Token("")
+
 // Set the token if necessary.
 func (token Token) Set(values url.Values) {
 	if token != PublicToken {
 		values.Set("access_token", string(token))
 	}
+}
+
+// An Error from the API.
+type Error struct {
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Code    int    `json:"code"`
+	Body    []byte
+}
+
+// Wrapper for "error"
+type errorResponse struct {
+	Error Error `json:"error"`
 }
 
 // String representation as defined by the error interface.
