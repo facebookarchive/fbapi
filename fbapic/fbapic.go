@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"time"
 
 	"github.com/daaku/go.fbapi"
@@ -29,28 +28,39 @@ type Cache struct {
 	Stats     Stats         // stats implementation
 	Prefix    string        // cache key prefix
 	Timeout   time.Duration // per value timeout
-	Client    *fbapi.Client // Facebook API Client
+	Client    fbapi.Client  // Facebook API Client
 }
 
-// Make a GET Graph API request.
-func (c *Cache) Get(result interface{}, path string, values ...fbapi.Values) error {
-	key := fmt.Sprintf("%s:%s", c.Prefix, path)
-	raw, err := c.ByteCache.Get(key)
-	if err != nil {
-		c.Stats.Inc("fbapic storage.Get error")
-		c.Stats.Inc("fbapic storage.Get error " + c.Prefix)
-		return fmt.Errorf("fbapic error in storage.Get: %s", err)
+// Make cached Graph API request.
+func (c *Cache) Do(result interface{}, method string, path string, values ...fbapi.Values) error {
+	var key string
+	if method == "GET" || method == "HEAD" {
+		key = fmt.Sprintf("%s:%s:%s", c.Prefix, method, path)
+	}
+
+	var raw []byte
+	var err error
+	if key != "" {
+		raw, err = c.ByteCache.Get(key)
+		if err != nil {
+			c.Stats.Inc("fbapic storage.Get error")
+			c.Stats.Inc("fbapic storage.Get error " + c.Prefix)
+			return fmt.Errorf("fbapic error in storage.Get: %s", err)
+		}
+
+		err = json.Unmarshal(raw, result)
+		if err != nil {
+			return fmt.Errorf(
+				"Request for path %s with response %s failed with "+
+					"json.Unmarshal error %s.", path, string(raw), err)
+		}
 	}
 
 	if raw == nil {
 		c.Stats.Inc("fbapic cache miss")
 		c.Stats.Inc("fbapic cache miss " + c.Prefix)
-		final := url.Values{}
-		for _, v := range values {
-			v.Set(final)
-		}
 		start := time.Now()
-		raw, err = c.Client.GetRaw(path, final)
+		err = c.Client.Do(result, method, path, values...)
 		if err != nil {
 			c.Stats.Inc("fbapic graph api error")
 			c.Stats.Inc("fbapic graph api error " + c.Prefix)
@@ -67,13 +77,6 @@ func (c *Cache) Get(result interface{}, path string, values ...fbapi.Values) err
 	} else {
 		c.Stats.Inc("fbapic cache hit")
 		c.Stats.Inc("fbapic cache hit " + c.Prefix)
-	}
-
-	err = json.Unmarshal(raw, result)
-	if err != nil {
-		return fmt.Errorf(
-			"Request for path %s with response %s failed with "+
-				"json.Unmarshal error %s.", path, string(raw), err)
 	}
 	return nil
 }

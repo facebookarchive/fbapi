@@ -1,170 +1,148 @@
-// Package fbapi provides wrappers to access the Facebook API.
+// Package fbapi provides a client for the Facebook API.
 package fbapi
 
 import (
 	"encoding/json"
-	"flag"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
-	"github.com/daaku/go.fburl"
+	"github.com/daaku/go.httperr"
 )
 
-const redactedStub = "$1=-- XX -- REDACTED -- XX --"
+var redactor = httperr.RedactRegexp(
+	regexp.MustCompile("(access_token|client_secret)=([^&]*)"),
+	"$1=-- XX -- REDACTED -- XX --",
+)
 
-var cleanURLRegExp = regexp.MustCompile("(access_token|client_secret)=([^&]*)")
-
-// Represents a thing that wants to modify the url.Values.
-type Values interface {
-	Set(url.Values)
-}
-
-// Generic Page options for list type queries.
-type Page struct {
-	Limit  int
-	Offset int
-}
-
-// Set the corresponding values for the Page.
-func (page Page) Set(values url.Values) {
-	if page.Limit != 0 {
-		values.Set("limit", strconv.Itoa(page.Limit))
-	}
-	if page.Offset != 0 {
-		values.Set("offset", strconv.Itoa(page.Offset))
-	}
-}
-
-// A slice of field names.
-type Fields []string
-
-// For selecting fields.
-func (fields Fields) Set(values url.Values) {
-	if len(fields) > 0 {
-		values.Set("fields", strings.Join(fields, ","))
-	}
-}
-
-// Represents an "access_token" for the Facebook API.
-type Token string
-
-const PublicToken = Token("")
-
-// Set the token if necessary.
-func (token Token) Set(values url.Values) {
-	if token != PublicToken {
-		values.Set("access_token", string(token))
-	}
+// The default base URL for the API.
+var DefaultBaseURL = &url.URL{
+	Scheme: "https",
+	Host:   "graph.facebook.com",
+	Path:   "/",
 }
 
 // An Error from the API.
 type Error struct {
+	// These are provided by the Facebook API and may not always be available.
 	Message string `json:"message"`
 	Type    string `json:"type"`
 	Code    int    `json:"code"`
-	Body    []byte
+
+	request  *http.Request  `json:"-"`
+	response *http.Response `json:"-"`
+	client   *Client
 }
 
-// Wrapper for "error"
+func (e *Error) Error() string {
+	var parts []string
+	if e.Code != 0 {
+		parts = append(parts, fmt.Sprintf("code %d", e.Code))
+	}
+	if e.Type != "" {
+		parts = append(parts, fmt.Sprintf("type %s", e.Type))
+	}
+	if e.Message != "" {
+		parts = append(parts, fmt.Sprintf("message %s", e.Message))
+	}
+	return httperr.NewError(
+		errors.New(strings.Join(parts, " ")),
+		e.client.redactor(),
+		e.request,
+		e.response,
+	).Error()
+}
+
+// Wrapper for "error" returned from Facebook APIs.
 type errorResponse struct {
 	Error Error `json:"error"`
 }
 
-// String representation as defined by the error interface.
-func (e *Error) Error() string {
-	return fmt.Sprintf("API call failed with error body:\n%s", string(e.Body))
-}
-
+// Underlying Http Client.
 type HttpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
 // Facebook API Client.
 type Client struct {
-	Redact     bool // When true known sensitive information will be stripped from errors
 	HttpClient HttpClient
+	BaseURL    *url.URL
+	Redact     bool // Redact sensitive information from errors when true
 }
 
-// remove known sensitive tokens from data
-func (c *Client) cleanURL(url string) string {
-	if c.Redact {
-		return cleanURLRegExp.ReplaceAllString(url, redactedStub)
-	}
-	return url
-}
+// Perform a Graph API request and unmarshal it's response. If the response is
+// an error, it will be returned as an error, else it will be unmarshalled into
+// the result.
+func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, error) {
+	req.Proto = "HTTP/1.1"
+	req.ProtoMajor = 1
+	req.ProtoMinor = 1
 
-// Make a GET Graph API request and get the raw body byte slice.
-func (c *Client) GetRaw(path string, values url.Values) ([]byte, error) {
-	const phpRFC3339 = `Y-m-d\TH:i:s\Z`
-	values.Set("date_format", phpRFC3339)
-	u := &fburl.URL{
-		Scheme:    "https",
-		SubDomain: fburl.DGraph,
-		Path:      path,
-		Values:    values,
-	}
-	req, err := http.NewRequest("GET", u.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.HttpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"Request for URL %s failed with error %s.", c.cleanURL(u.String()), err)
-	}
-	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"Request for URL %s failed because body could not be read "+
-				"with error %s.",
-			c.cleanURL(u.String()), err)
-	}
-	if resp.StatusCode > 399 || resp.StatusCode < 200 {
-		apiError := &errorResponse{Error{Body: b}}
-		err = json.Unmarshal(b, apiError)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"Parsing error response failed with %s:\n%s", err, string(b))
+	if req.URL == nil {
+		if c.BaseURL == nil {
+			req.URL = DefaultBaseURL
+		} else {
+			req.URL = c.BaseURL
 		}
-		return nil, &apiError.Error
+	} else {
+		if !req.URL.IsAbs() {
+			if c.BaseURL == nil {
+				req.URL = DefaultBaseURL.ResolveReference(req.URL)
+			} else {
+				req.URL = c.BaseURL.ResolveReference(req.URL)
+			}
+		}
 	}
-	return b, nil
+
+	if req.Host == "" {
+		req.Host = req.URL.Host
+	}
+
+	res, err := c.HttpClient.Do(req)
+	if err != nil {
+		return nil, httperr.RedactError(err, c.redactor())
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode > 399 || res.StatusCode < 200 {
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return res, httperr.NewError(err, c.redactor(), req, res)
+		}
+
+		apiErrorResponse := &errorResponse{
+			Error: Error{
+				request:  req,
+				response: res,
+				client:   c,
+			},
+		}
+		err = json.Unmarshal(body, apiErrorResponse)
+		if err != nil {
+			return res, httperr.NewError(err, c.redactor(), req, res)
+		}
+		return res, &apiErrorResponse.Error
+	}
+
+	if result == nil {
+		_, err = io.Copy(ioutil.Discard, res.Body)
+	} else {
+		err = json.NewDecoder(res.Body).Decode(result)
+	}
+	if err != nil {
+		return res, httperr.NewError(err, c.redactor(), req, res)
+	}
+	return res, nil
 }
 
-// Make a GET Graph API request.
-func (c *Client) Get(result interface{}, path string, values ...Values) error {
-	final := url.Values{}
-	for _, v := range values {
-		v.Set(final)
+func (c *Client) redactor() httperr.Redactor {
+	if !c.Redact {
+		return httperr.RedactNoOp()
 	}
-	b, err := c.GetRaw(path, final)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(b, result)
-	if err != nil {
-		return fmt.Errorf(
-			"Request for path %s with response %s failed with "+
-				"json.Unmarshal error %s.",
-			c.cleanURL(path), string(b), err)
-	}
-	return nil
-}
-
-// A Flag configured Client.
-func ClientFlag(name string) *Client {
-	c := &Client{}
-	flag.BoolVar(
-		&c.Redact,
-		name+".redact",
-		true,
-		name+" redact known sensitive information from errors",
-	)
-	return c
+	return redactor
 }
