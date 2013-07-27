@@ -4,6 +4,7 @@ package fbapi
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -68,6 +69,18 @@ type Client struct {
 	Transport http.RoundTripper
 	BaseURL   *url.URL
 	Redact    bool // Redact sensitive information from errors when true
+}
+
+// Configure a Facebook API Client using flags.
+func ClientFlag(name string) *Client {
+	c := &Client{}
+	flag.BoolVar(
+		&c.Redact,
+		name+".redact",
+		true,
+		name+" redact known sensitive information from errors",
+	)
+	return c
 }
 
 // Perform a Graph API request and unmarshal it's response. If the response is
