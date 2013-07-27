@@ -21,9 +21,8 @@ var (
 		RequestTimeout:        time.Minute,
 		Stats:                 logRequestHandler,
 	}
-	defaultHttpClient = &http.Client{Transport: defaultHttpTransport}
-	defaultFbClient   = &fbapi.Client{
-		HttpClient: defaultHttpClient,
+	defaultFbClient = &fbapi.Client{
+		Transport: defaultHttpTransport,
 	}
 
 	logRequest = flag.Bool(

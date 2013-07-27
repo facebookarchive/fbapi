@@ -63,16 +63,11 @@ type errorResponse struct {
 	Error Error `json:"error"`
 }
 
-// Underlying Http Client.
-type HttpClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 // Facebook API Client.
 type Client struct {
-	HttpClient HttpClient
-	BaseURL    *url.URL
-	Redact     bool // Redact sensitive information from errors when true
+	Transport http.RoundTripper
+	BaseURL   *url.URL
+	Redact    bool // Redact sensitive information from errors when true
 }
 
 // Perform a Graph API request and unmarshal it's response. If the response is
@@ -103,7 +98,11 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 		req.Host = req.URL.Host
 	}
 
-	res, err := c.HttpClient.Do(req)
+	if req.Header == nil {
+		req.Header = make(http.Header)
+	}
+
+	res, err := c.Transport.RoundTrip(req)
 	if err != nil {
 		return nil, httperr.RedactError(err, c.redactor())
 	}
