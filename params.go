@@ -59,7 +59,7 @@ func (p paramFields) Set(values url.Values) error {
 }
 
 // Specify the fields to include.
-func ParamFields(fields []string) Param {
+func ParamFields(fields ...string) Param {
 	return paramFields(fields)
 }
 
