@@ -21,9 +21,7 @@ var (
 		RequestTimeout:        time.Minute,
 		Stats:                 logRequestHandler,
 	}
-	defaultFbClient = &fbapi.Client{
-		Transport: defaultHttpTransport,
-	}
+	defaultFbClient = fbapi.ClientFlag("fbapi-test")
 
 	logRequest = flag.Bool(
 		"log-requests",
@@ -38,6 +36,7 @@ func init() {
 	if err := defaultHttpTransport.Start(); err != nil {
 		panic(err)
 	}
+	defaultFbClient.Transport = defaultHttpTransport
 }
 
 func logRequestHandler(stats *httpcontrol.Stats) {
