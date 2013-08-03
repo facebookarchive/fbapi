@@ -2,6 +2,7 @@ package fbapi_test
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -283,4 +284,30 @@ func TestHTMLResponse(t *testing.T) {
 	}
 	server.CloseClientConnections()
 	server.Close()
+}
+
+type errorTransport struct{}
+
+func (e errorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, errors.New("42")
+}
+
+func TestTransportError(t *testing.T) {
+	t.Parallel()
+	c := &fbapi.Client{
+		Transport: errorTransport{},
+	}
+	res := make(map[string]interface{})
+	_, err := c.Do(&http.Request{Method: "GET"}, res)
+	if err == nil {
+		t.Fatalf("was expecting an error instead got %v", res)
+	}
+	const expected = "42"
+	if err.Error() != expected {
+		t.Fatalf(
+			`did not contain expected error "%s" instead got "%s"`,
+			expected,
+			err,
+		)
+	}
 }
