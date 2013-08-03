@@ -181,3 +181,22 @@ func TestRelativeToBaseURL(t *testing.T) {
 		t.Fatalf("was expecting status 404 but got %d", res.StatusCode)
 	}
 }
+
+func TestPublicGetDiscardBody(t *testing.T) {
+	t.Parallel()
+	res, err := defaultFbClient.Do(
+		&http.Request{
+			Method: "GET",
+			URL: &url.URL{
+				Path: "5526183",
+			},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != 200 {
+		t.Fatalf("was expecting status 200 but got %d", res.StatusCode)
+	}
+}
