@@ -149,3 +149,35 @@ func TestNilURLWithBaseURL(t *testing.T) {
 		t.Fatalf("was expecting status 404 but got %d", res.StatusCode)
 	}
 }
+
+func TestRelativeToBaseURL(t *testing.T) {
+	t.Parallel()
+	client := &fbapi.Client{
+		BaseURL: &url.URL{
+			Scheme: "https",
+			Host:   "graph.facebook.com",
+			Path:   "/20aa2519-4745-4522-92a9-4522b8edf6e9/",
+		},
+	}
+	res, err := client.Do(
+		&http.Request{Method: "GET", URL: &url.URL{Path: "0"}},
+		nil,
+	)
+	if err == nil {
+		t.Fatal("was expecting error")
+	}
+
+	const expected = `GET ` +
+		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9/0 got ` +
+		`404 Not Found failed with code 803 type OAuthException message (#803) ` +
+		`Some of the aliases you requested do not exist: ` +
+		`20aa2519-4745-4522-92a9-4522b8edf6e9`
+
+	if err.Error() != expected {
+		t.Fatalf(`expected "%s" got "%s"`, expected, err)
+	}
+
+	if res.StatusCode != 404 {
+		t.Fatalf("was expecting status 404 but got %d", res.StatusCode)
+	}
+}
