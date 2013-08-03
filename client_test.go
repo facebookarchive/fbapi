@@ -1,10 +1,13 @@
 package fbapi_test
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -198,5 +201,45 @@ func TestPublicGetDiscardBody(t *testing.T) {
 	}
 	if res.StatusCode != 200 {
 		t.Fatalf("was expecting status 200 but got %d", res.StatusCode)
+	}
+}
+
+func TestServerAbort(t *testing.T) {
+	t.Parallel()
+	for _, code := range []int{200, 500} {
+		server := httptest.NewServer(
+			http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Add("Content-Length", "4000")
+					w.WriteHeader(code)
+					w.Write(bytes.Repeat([]byte("a"), 3000))
+				},
+			),
+		)
+
+		u, err := url.Parse(server.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		c := &fbapi.Client{
+			Transport: defaultHttpTransport,
+			BaseURL:   u,
+		}
+		res := make(map[string]interface{})
+		_, err = c.Do(&http.Request{Method: "GET"}, res)
+		if err == nil {
+			t.Fatalf("was expecting an error instead got %v", res)
+		}
+		expected := fmt.Sprintf(`GET %s`, server.URL)
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf(
+				`did not contain expected error "%s" instead got "%s"`,
+				expected,
+				err,
+			)
+		}
+		server.CloseClientConnections()
+		server.Close()
 	}
 }
