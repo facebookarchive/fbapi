@@ -12,7 +12,7 @@ import (
 func Example() {
 	client := &fbapi.Client{}
 	var user struct {
-		ID   uint64 `json:"id"`
+		ID   uint64 `json:"id,string"`
 		Name string `json:"name"`
 	}
 	_, err := client.Do(
@@ -24,4 +24,6 @@ func Example() {
 		os.Exit(1)
 	}
 	fmt.Printf("%+v", user)
+
+	// Output: {ID:5526183 Name:Naitik Shah}
 }
