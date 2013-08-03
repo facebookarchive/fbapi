@@ -243,3 +243,44 @@ func TestServerAbort(t *testing.T) {
 		server.Close()
 	}
 }
+
+func TestHTMLResponse(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(500)
+				w.Write([]byte("<html></html>"))
+			},
+		),
+	)
+
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c := &fbapi.Client{
+		Transport: defaultHttpTransport,
+		BaseURL:   u,
+	}
+	res := make(map[string]interface{})
+	_, err = c.Do(&http.Request{Method: "GET"}, res)
+	if err == nil {
+		t.Fatalf("was expecting an error instead got %v", res)
+	}
+	expected := fmt.Sprintf(
+		`GET %s got 500 Internal Server Error failed with invalid character '<' `+
+			`looking for beginning of value`,
+		server.URL,
+	)
+	if err.Error() != expected {
+		t.Fatalf(
+			`did not contain expected error "%s" instead got "%s"`,
+			expected,
+			err,
+		)
+	}
+	server.CloseClientConnections()
+	server.Close()
+}
