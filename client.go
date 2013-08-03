@@ -66,9 +66,17 @@ type errorResponse struct {
 
 // Facebook API Client.
 type Client struct {
+	// The underlying http.RoundTripper to perform the individual requests. When
+	// nil http.DefaultTransport will be used.
 	Transport http.RoundTripper
-	BaseURL   *url.URL
-	Redact    bool // Redact sensitive information from errors when true
+
+	// The base URL to parse relative URLs off. If you pass absolute URLs to the
+	// Do function this is not used. DefaultBaseURL will be used instead if this
+	// is nil.
+	BaseURL *url.URL
+
+	// Redact sensitive information from errors when true.
+	Redact bool
 }
 
 // Configure a Facebook API Client using flags.
@@ -81,6 +89,13 @@ func ClientFlag(name string) *Client {
 		name+" redact known sensitive information from errors",
 	)
 	return c
+}
+
+func (c *Client) transport() http.RoundTripper {
+	if c.Transport == nil {
+		return http.DefaultTransport
+	}
+	return c.Transport
 }
 
 // Perform a Graph API request and unmarshal it's response. If the response is
@@ -115,7 +130,7 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 		req.Header = make(http.Header)
 	}
 
-	res, err := c.Transport.RoundTrip(req)
+	res, err := c.transport().RoundTrip(req)
 	if err != nil {
 		return nil, httperr.RedactError(err, c.redactor())
 	}
