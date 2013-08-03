@@ -11,19 +11,20 @@ import (
 
 func Example() {
 	client := &fbapi.Client{}
-	var user struct {
-		ID   uint64 `json:"id,string"`
-		Name string `json:"name"`
+	var show struct {
+		ID      uint64 `json:"id,string"`
+		Name    string `json:"name"`
+		Network string `json:"network"`
 	}
 	_, err := client.Do(
-		&http.Request{Method: "GET", URL: &url.URL{Path: "naitik"}},
-		&user,
+		&http.Request{Method: "GET", URL: &url.URL{Path: "DoctorWho"}},
+		&show,
 	)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	fmt.Printf("%+v", user)
+	fmt.Printf("%+v", show)
 
-	// Output: {ID:5526183 Name:Naitik Shah}
+	// Output: {ID:127031120644257 Name:Naitik Shah Network:BBC Worldwide}
 }
