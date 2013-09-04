@@ -37,7 +37,7 @@ type Error struct {
 
 	request  *http.Request  `json:"-"`
 	response *http.Response `json:"-"`
-	client   *Client
+	redactor httperr.Redactor
 }
 
 func (e *Error) Error() string {
@@ -53,7 +53,7 @@ func (e *Error) Error() string {
 	}
 	return httperr.NewError(
 		errors.New(strings.Join(parts, " ")),
-		e.client.redactor(),
+		e.redactor,
 		e.request,
 		e.response,
 	).Error()
@@ -131,44 +131,57 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 
 	res, err := c.transport().RoundTrip(req)
 	if err != nil {
-		return nil, httperr.RedactError(err, c.redactor())
+		return nil, httperr.RedactError(err, c.Redactor())
 	}
+
+	if err := UnmarshalResponse(res, c.Redactor(), result); err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+// Provides the httperr.Redactor to strip the fbapi related sensitive
+// information from error messages, for example the access_token.
+func (c *Client) Redactor() httperr.Redactor {
+	if !c.Redact {
+		return httperr.RedactNoOp()
+	}
+	return redactor
+}
+
+// Unmarshals the http.Response from a Facebook API request into result,
+// possibly returning an error if the process fails.
+func UnmarshalResponse(res *http.Response, redactor httperr.Redactor, result interface{}) error {
 	defer res.Body.Close()
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return res, httperr.NewError(err, c.redactor(), req, res)
+			return httperr.NewError(err, redactor, res.Request, res)
 		}
 
 		apiErrorResponse := &errorResponse{
 			Error: Error{
-				request:  req,
+				request:  res.Request,
 				response: res,
-				client:   c,
+				redactor: redactor,
 			},
 		}
 		err = json.Unmarshal(body, apiErrorResponse)
 		if err != nil {
-			return res, httperr.NewError(err, c.redactor(), req, res)
+			return httperr.NewError(err, redactor, res.Request, res)
 		}
-		return res, &apiErrorResponse.Error
+		return &apiErrorResponse.Error
 	}
 
+	var err error
 	if result == nil {
 		_, err = io.Copy(ioutil.Discard, res.Body)
 	} else {
 		err = json.NewDecoder(res.Body).Decode(result)
 	}
 	if err != nil {
-		return res, httperr.NewError(err, c.redactor(), req, res)
+		return httperr.NewError(err, redactor, res.Request, res)
 	}
-	return res, nil
-}
-
-func (c *Client) redactor() httperr.Redactor {
-	if !c.Redact {
-		return httperr.RedactNoOp()
-	}
-	return redactor
+	return nil
 }

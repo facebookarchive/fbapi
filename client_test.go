@@ -114,7 +114,7 @@ func TestNilURLWithDefaultBaseURL(t *testing.T) {
 
 	const expected = `GET https://graph.facebook.com/ got 400 Bad Request ` +
 		`failed with code 100 type GraphMethodException message Unsupported get ` +
-		`request`
+		`request.`
 
 	if err.Error() != expected {
 		t.Fatalf(`expected "%s" got "%s"`, expected, err)
