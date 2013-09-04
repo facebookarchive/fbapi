@@ -150,7 +150,8 @@ func (c *Client) Redactor() httperr.Redactor {
 }
 
 // Unmarshals the http.Response from a Facebook API request into result,
-// possibly returning an error if the process fails.
+// possibly returning an error if the process fails or if the API returned an
+// error.
 func UnmarshalResponse(res *http.Response, redactor httperr.Redactor, result interface{}) error {
 	defer res.Body.Close()
 

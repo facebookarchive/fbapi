@@ -1,10 +1,9 @@
 // Package fbbatch provides a Client with single call semantics which will
-// automatically use Facebook Graph Batch semantics under the hood.
+// automatically use Facebook Graph Batch implementation under the hood.
 //
-// This allows for a simple single call model that transparently uses batching
-// for greater efficiency. You should be aware of how the Facebook Graph API
-// resource limits are applicable for your use case and configure the client
-// appropriately.
+// This allows for transparently using batching for greater efficiency. You
+// should be aware of how the Facebook Graph API resource limits are applicable
+// for your use case and configure the client appropriately.
 //
 // For the official documentation look at:
 // https://developers.facebook.com/docs/reference/api/batch/
