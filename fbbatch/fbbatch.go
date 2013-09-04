@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -106,6 +107,7 @@ func (r *Response) httpResponse() (*http.Response, error) {
 // Describes a Batch call.
 type Batch struct {
 	AccessToken string
+	AppID       uint64
 	Request     []*Request
 }
 
@@ -113,7 +115,13 @@ type Batch struct {
 // not for the individual requests.
 func BatchDo(c *fbapi.Client, b *Batch) ([]*Response, error) {
 	v := make(url.Values)
-	v.Add("access_token", b.AccessToken)
+
+	if b.AccessToken != "" {
+		v.Add("access_token", b.AccessToken)
+	}
+	if b.AppID != 0 {
+		v.Add("batch_app_id", strconv.FormatUint(b.AppID, 10))
+	}
 
 	j, err := json.Marshal(b.Request)
 	if err != nil {
@@ -149,6 +157,7 @@ type workRequest struct {
 type Client struct {
 	Client       *fbapi.Client
 	AccessToken  string
+	AppID        uint64
 	MaxBatchSize int
 	BatchTimeout time.Duration
 	work         chan *workRequest
@@ -211,6 +220,7 @@ func (c *Client) send(rrs []*workRequest) {
 	defer c.workGroup.Done()
 	b := &Batch{
 		AccessToken: c.AccessToken,
+		AppID:       c.AppID,
 		Request:     make([]*Request, len(rrs)),
 	}
 	for i, rr := range rrs {
