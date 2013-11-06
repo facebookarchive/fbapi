@@ -47,9 +47,6 @@ func accessToken() string {
 
 func init() {
 	flag.Parse()
-	if err := defaultHttpTransport.Start(); err != nil {
-		panic(err)
-	}
 	defaultFbClient.Transport = defaultHttpTransport
 
 	// default app for testing

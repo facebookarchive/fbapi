@@ -37,9 +37,6 @@ var (
 func init() {
 	flag.Usage = flagconfig.Usage
 	flagconfig.Parse()
-	if err := defaultHttpTransport.Start(); err != nil {
-		panic(err)
-	}
 	defaultFbClient.Transport = defaultHttpTransport
 }
 
