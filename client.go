@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/daaku/go.httperr"
+	"github.com/ParsePlatform/go.httperr"
 )
 
 var redactor = httperr.RedactRegexp(

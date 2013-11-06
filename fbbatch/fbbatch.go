@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/daaku/go.fbapi"
+	"github.com/ParsePlatform/go.fbapi"
 )
 
 var (

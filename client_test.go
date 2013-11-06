@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daaku/go.fbapi"
-	"github.com/daaku/go.flagconfig"
-	"github.com/daaku/go.httpcontrol"
+	"github.com/ParsePlatform/go.fbapi"
+	"github.com/ParsePlatform/go.flagconfig"
+	"github.com/ParsePlatform/go.httpcontrol"
 )
 
 var (

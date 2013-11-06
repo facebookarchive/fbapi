@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/daaku/go.fbapi"
-	"github.com/daaku/go.fbapi/fbbatch"
-	"github.com/daaku/go.fbapp"
-	"github.com/daaku/go.httpcontrol"
-	"github.com/daaku/go.subset"
+	"github.com/ParsePlatform/go.fbapi"
+	"github.com/ParsePlatform/go.fbapi/fbbatch"
+	"github.com/ParsePlatform/go.fbapp"
+	"github.com/ParsePlatform/go.httpcontrol"
+	"github.com/ParsePlatform/go.subset"
 )
 
 var (

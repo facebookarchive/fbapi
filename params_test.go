@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/daaku/go.fbapi"
+	"github.com/ParsePlatform/go.fbapi"
 )
 
 const paramWithErrorMessage = "foo"
