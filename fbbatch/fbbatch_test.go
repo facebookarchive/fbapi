@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ParsePlatform/go.fbapi"
-	"github.com/ParsePlatform/go.fbapi/fbbatch"
-	"github.com/ParsePlatform/go.fbapp"
-	"github.com/ParsePlatform/go.httpcontrol"
-	"github.com/ParsePlatform/go.subset"
+	"github.com/facebookgo/fbapi"
+	"github.com/facebookgo/fbapi/fbbatch"
+	"github.com/facebookgo/fbapp"
+	"github.com/facebookgo/httpcontrol"
+	"github.com/facebookgo/subset"
 )
 
 var (

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ParsePlatform/go.fbapi"
-	"github.com/ParsePlatform/go.flagconfig"
-	"github.com/ParsePlatform/go.httpcontrol"
+	"github.com/facebookgo/fbapi"
+	"github.com/facebookgo/flagconfig"
+	"github.com/facebookgo/httpcontrol"
 )
 
 var (
@@ -87,14 +87,15 @@ func TestInvalidGet(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 
-	const expected = `GET ` +
-		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9 got ` +
-		`404 Not Found failed with code 803 type OAuthException message (#803) ` +
+	const expectedPrefix = `GET ` +
+		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9 got `
+	const expectedSuffix = `failed with code 803 type OAuthException message (#803) ` +
 		`Some of the aliases you requested do not exist: ` +
 		`20aa2519-4745-4522-92a9-4522b8edf6e9`
 
-	if err.Error() != expected {
-		t.Fatalf(`expected "%s" got "%s"`, expected, err)
+	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
+		!strings.HasSuffix(err.Error(), expectedSuffix) {
+		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
 	}
 
 	if res.StatusCode != 404 {
@@ -109,12 +110,13 @@ func TestNilURLWithDefaultBaseURL(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 
-	const expected = `GET https://graph.facebook.com/ got 400 Bad Request ` +
-		`failed with code 100 type GraphMethodException message Unsupported get ` +
+	const expectedPrefix = `GET https://graph.facebook.com/ got`
+	const expectedSuffix = `failed with code 100 type GraphMethodException message Unsupported get ` +
 		`request.`
 
-	if err.Error() != expected {
-		t.Fatalf(`expected "%s" got "%s"`, expected, err)
+	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
+		!strings.HasSuffix(err.Error(), expectedSuffix) {
+		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
 	}
 
 	if res.StatusCode != 400 {
@@ -136,14 +138,15 @@ func TestNilURLWithBaseURL(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 
-	const expected = `GET ` +
-		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9 got ` +
-		`404 Not Found failed with code 803 type OAuthException message (#803) ` +
+	const expectedPrefix = `GET ` +
+		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9`
+	const expectedSuffix = `failed with code 803 type OAuthException message (#803) ` +
 		`Some of the aliases you requested do not exist: ` +
 		`20aa2519-4745-4522-92a9-4522b8edf6e9`
 
-	if err.Error() != expected {
-		t.Fatalf(`expected "%s" got "%s"`, expected, err)
+	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
+		!strings.HasSuffix(err.Error(), expectedSuffix) {
+		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
 	}
 
 	if res.StatusCode != 404 {
@@ -168,14 +171,15 @@ func TestRelativeToBaseURL(t *testing.T) {
 		t.Fatal("was expecting error")
 	}
 
-	const expected = `GET ` +
-		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9/0 got ` +
-		`404 Not Found failed with code 803 type OAuthException message (#803) ` +
+	const expectedPrefix = `GET ` +
+		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9/0`
+	const expectedSuffix = `failed with code 803 type OAuthException message (#803) ` +
 		`Some of the aliases you requested do not exist: ` +
 		`20aa2519-4745-4522-92a9-4522b8edf6e9`
 
-	if err.Error() != expected {
-		t.Fatalf(`expected "%s" got "%s"`, expected, err)
+	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
+		!strings.HasSuffix(err.Error(), expectedSuffix) {
+		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
 	}
 
 	if res.StatusCode != 404 {

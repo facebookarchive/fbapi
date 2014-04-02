@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ParsePlatform/go.httperr"
+	"github.com/facebookgo/httperr"
 )
 
 var redactor = httperr.RedactRegexp(
@@ -68,7 +68,7 @@ type errorResponse struct {
 type Client struct {
 	// The underlying http.RoundTripper to perform the individual requests. When
 	// nil http.DefaultTransport will be used.
-	Transport http.RoundTripper
+	Transport http.RoundTripper `inject:""`
 
 	// The base URL to parse relative URLs off. If you pass absolute URLs to Client
 	// functions they are used as-is. When nil DefaultBaseURL will be used.

@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/ParsePlatform/go.fbapi"
+	"github.com/facebookgo/fbapi"
 )
 
 func Example() {
