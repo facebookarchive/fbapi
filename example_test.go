@@ -26,5 +26,5 @@ func Example() {
 	}
 	fmt.Printf("%+v", show)
 
-	// Output: {ID:127031120644257 Name:Doctor Who Network:BBC Worldwide}
+	// Output: {ID:127031120644257 Name:Doctor Who Network:BBC}
 }
