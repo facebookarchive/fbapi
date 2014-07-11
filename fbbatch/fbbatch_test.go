@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	defaultHttpTransport = &httpcontrol.Transport{
+	defaultHTTPTransport = &httpcontrol.Transport{
 		MaxIdleConnsPerHost:   50,
 		DialTimeout:           3 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
@@ -47,7 +47,7 @@ func accessToken() string {
 
 func init() {
 	flag.Parse()
-	defaultFbClient.Transport = defaultHttpTransport
+	defaultFbClient.Transport = defaultHTTPTransport
 
 	// default app for testing
 	if defaultApp.ID() == 0 {

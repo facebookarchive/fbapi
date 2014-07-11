@@ -11,7 +11,7 @@ type Param interface {
 	Set(v url.Values) error
 }
 
-// Build url.Values from the given Params.
+// ParamValues builds url.Values from the given Params.
 func ParamValues(params ...Param) (v url.Values, err error) {
 	v = make(url.Values)
 	for _, p := range params {
@@ -30,7 +30,7 @@ func (p paramLimit) Set(v url.Values) error {
 	return nil
 }
 
-// Specify a limit. Note, 0 values are also sent.
+// ParamLimit specifies a limit. Note, 0 values are also sent.
 func ParamLimit(limit uint64) Param {
 	return paramLimit(limit)
 }
@@ -44,7 +44,8 @@ func (p paramOffset) Set(v url.Values) error {
 	return nil
 }
 
-// Specify number of items to offset. Note, 0 values are not sent.
+// ParamOffset specifies the number of items to offset. Note, 0 values are not
+// sent.
 func ParamOffset(offset uint64) Param {
 	return paramOffset(offset)
 }
@@ -58,7 +59,7 @@ func (p paramFields) Set(values url.Values) error {
 	return nil
 }
 
-// Specify the fields to include.
+// ParamFields specifies the fields to include.
 func ParamFields(fields ...string) Param {
 	return paramFields(fields)
 }
@@ -72,7 +73,7 @@ func (p paramAccessToken) Set(values url.Values) error {
 	return nil
 }
 
-// An access_token parameter.
+// ParamAccessToken specifies the access_token parameter.
 func ParamAccessToken(token string) Param {
 	return paramAccessToken(token)
 }
@@ -86,7 +87,7 @@ func (p paramDateFormat) Set(values url.Values) error {
 	return nil
 }
 
-// The date format parameter.
+// ParamDateFormat specifies the date_format parameter.
 func ParamDateFormat(format string) Param {
 	return paramDateFormat(format)
 }

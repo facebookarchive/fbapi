@@ -25,12 +25,15 @@ import (
 )
 
 var (
+	// DefaultBatchTimeout configures the default timeout after which a batch
+	// will be fired.
 	DefaultBatchTimeout = flag.Duration(
 		"fbbatch.batch_timeout",
 		time.Millisecond*10,
 		"default batch timeout",
 	)
 
+	// DefaultMaxBatchSize configures the default maximum batch size.
 	DefaultMaxBatchSize = flag.Int(
 		"fbbatch.max_batch_size",
 		50,
@@ -40,7 +43,7 @@ var (
 	errNotStarted = errors.New("fbbatch: client not started")
 )
 
-// Describes a Request in a Batch.
+// Request in a Batch.
 type Request struct {
 	Name        string `json:"name,omitempty"`
 	Method      string `json:"method,omitempty"`
@@ -71,13 +74,13 @@ func newRequest(hr *http.Request) (*Request, error) {
 	return req, nil
 }
 
-// Describes Headers in a Batch Response.
+// Header in a Batch Response.
 type Header struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
-// Describes a Response in a Batch.
+// Response in a Batch.
 type Response struct {
 	Code   int      `json:"code"`
 	Header []Header `json:"headers"`
@@ -104,15 +107,15 @@ func (r *Response) httpResponse() (*http.Response, error) {
 	return res, nil
 }
 
-// Describes a Batch call.
+// Batch of Requests.
 type Batch struct {
 	AccessToken string
 	AppID       uint64
 	Request     []*Request
 }
 
-// Perform a Batch call. Errors are only returned if the batch itself fails,
-// not for the individual requests.
+// BatchDo performs a Batch call. Errors are only returned if the batch itself
+// fails, not for the individual requests.
 func BatchDo(c *fbapi.Client, b *Batch) ([]*Response, error) {
 	v := make(url.Values)
 
@@ -152,8 +155,8 @@ type workRequest struct {
 	Response chan *workResponse
 }
 
-// Provides a Client with the same interface as fbapi.Client but one where the
-// underlying requests are automatically batched together.
+// Client with the same interface as fbapi.Client but one where the underlying
+// requests are automatically batched together.
 type Client struct {
 	Client       *fbapi.Client
 	AccessToken  string
@@ -236,9 +239,9 @@ func (c *Client) send(rrs []*workRequest) {
 	}
 }
 
-// Perform a Graph API request and unmarshal it's response. If the response is
-// an error, it will be returned as an error, else it will be unmarshalled into
-// the result.
+// Do performs a Graph API request and unmarshal it's response. If the response
+// is an error, it will be returned as an error, else it will be unmarshalled
+// into the result.
 func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, error) {
 	if c.work == nil {
 		return nil, errNotStarted

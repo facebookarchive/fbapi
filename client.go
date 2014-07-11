@@ -35,8 +35,8 @@ type Error struct {
 	Type    string `json:"type"`
 	Code    int    `json:"code"`
 
-	request  *http.Request  `json:"-"`
-	response *http.Response `json:"-"`
+	request  *http.Request
+	response *http.Response
 	redactor httperr.Redactor
 }
 
@@ -64,7 +64,7 @@ type errorResponse struct {
 	Error Error `json:"error"`
 }
 
-// Facebook API Client.
+// Client for the Facebook API.
 type Client struct {
 	// The underlying http.RoundTripper to perform the individual requests. When
 	// nil http.DefaultTransport will be used.
@@ -78,7 +78,7 @@ type Client struct {
 	Redact bool
 }
 
-// Configure a Facebook API Client using flags.
+// ClientFlag returns a Facebook API Client configured using flags.
 func ClientFlag(name string) *Client {
 	c := &Client{}
 	flag.BoolVar(
@@ -97,9 +97,9 @@ func (c *Client) transport() http.RoundTripper {
 	return c.Transport
 }
 
-// Perform a Graph API request and unmarshal it's response. If the response is
-// an error, it will be returned as an error, else it will be unmarshalled into
-// the result.
+// Do performs a Graph API request and unmarshal it's response. If the response
+// is an error, it will be returned as an error, else it will be unmarshalled
+// into the result.
 func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, error) {
 	req.Proto = "HTTP/1.1"
 	req.ProtoMajor = 1
@@ -140,7 +140,7 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 	return res, nil
 }
 
-// Provides the httperr.Redactor to strip the fbapi related sensitive
+// Redactor provides a httperr.Redactor to strip the fbapi related sensitive
 // information from error messages, for example the access_token.
 func (c *Client) Redactor() httperr.Redactor {
 	if !c.Redact {
@@ -149,9 +149,9 @@ func (c *Client) Redactor() httperr.Redactor {
 	return redactor
 }
 
-// Unmarshals the http.Response from a Facebook API request into result,
-// possibly returning an error if the process fails or if the API returned an
-// error.
+// UnmarshalResponse will unmarshal a http.Response from a Facebook API request
+// into result, possibly returning an error if the process fails or if the API
+// returned an error.
 func UnmarshalResponse(res *http.Response, redactor httperr.Redactor, result interface{}) error {
 	defer res.Body.Close()
 

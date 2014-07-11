@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	defaultHttpTransport = &httpcontrol.Transport{
+	defaultHTTPTransport = &httpcontrol.Transport{
 		MaxIdleConnsPerHost:   50,
 		DialTimeout:           3 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
@@ -37,7 +37,7 @@ var (
 func init() {
 	flag.Usage = flagconfig.Usage
 	flagconfig.Parse()
-	defaultFbClient.Transport = defaultHttpTransport
+	defaultFbClient.Transport = defaultHTTPTransport
 }
 
 func logRequestHandler(stats *httpcontrol.Stats) {
@@ -225,7 +225,7 @@ func TestServerAbort(t *testing.T) {
 		}
 
 		c := &fbapi.Client{
-			Transport: defaultHttpTransport,
+			Transport: defaultHTTPTransport,
 			BaseURL:   u,
 		}
 		res := make(map[string]interface{})
@@ -263,7 +263,7 @@ func TestHTMLResponse(t *testing.T) {
 	}
 
 	c := &fbapi.Client{
-		Transport: defaultHttpTransport,
+		Transport: defaultHTTPTransport,
 		BaseURL:   u,
 	}
 	res := make(map[string]interface{})
