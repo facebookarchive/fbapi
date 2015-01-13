@@ -8,10 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
+	"regexp"
 	"testing"
 	"time"
 
+	"github.com/facebookgo/ensure"
 	"github.com/facebookgo/fbapi"
 	"github.com/facebookgo/flagconfig"
 	"github.com/facebookgo/httpcontrol"
@@ -61,15 +62,9 @@ func TestPublicGet(t *testing.T) {
 		},
 		&user,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.StatusCode != 200 {
-		t.Fatalf("was expecting status 200 but got %d", res.StatusCode)
-	}
-	if user.Username != "naitik" {
-		t.Fatalf("was expecting naitik but got %s", user.Username)
-	}
+	ensure.Nil(t, err)
+	ensure.DeepEqual(t, res.StatusCode, 200)
+	ensure.DeepEqual(t, user.Username, "naitik")
 }
 
 func TestInvalidGet(t *testing.T) {
@@ -83,45 +78,15 @@ func TestInvalidGet(t *testing.T) {
 		},
 		nil,
 	)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-
-	const expectedPrefix = `GET ` +
-		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9 got `
-	const expectedSuffix = `failed with code 803 type OAuthException message (#803) ` +
-		`Some of the aliases you requested do not exist: ` +
-		`20aa2519-4745-4522-92a9-4522b8edf6e9`
-
-	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
-		!strings.HasSuffix(err.Error(), expectedSuffix) {
-		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
-	}
-
-	if res.StatusCode != 404 {
-		t.Fatalf("was expecting status 404 but got %d", res.StatusCode)
-	}
+	ensure.Err(t, err, regexp.MustCompile(`failed with code 803`))
+	ensure.DeepEqual(t, res.StatusCode, 404)
 }
 
 func TestNilURLWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	res, err := defaultFbClient.Do(&http.Request{Method: "GET"}, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-
-	const expectedPrefix = `GET https://graph.facebook.com/ got`
-	const expectedSuffix = `failed with code 100 type GraphMethodException message Unsupported get ` +
-		`request.`
-
-	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
-		!strings.HasSuffix(err.Error(), expectedSuffix) {
-		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
-	}
-
-	if res.StatusCode != 400 {
-		t.Fatalf("was expecting status 400 but got %d", res.StatusCode)
-	}
+	ensure.Err(t, err, regexp.MustCompile(`failed with code 100`))
+	ensure.DeepEqual(t, res.StatusCode, 400)
 }
 
 func TestNilURLWithBaseURL(t *testing.T) {
@@ -134,24 +99,8 @@ func TestNilURLWithBaseURL(t *testing.T) {
 		},
 	}
 	res, err := client.Do(&http.Request{Method: "GET"}, nil)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-
-	const expectedPrefix = `GET ` +
-		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9`
-	const expectedSuffix = `failed with code 803 type OAuthException message (#803) ` +
-		`Some of the aliases you requested do not exist: ` +
-		`20aa2519-4745-4522-92a9-4522b8edf6e9`
-
-	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
-		!strings.HasSuffix(err.Error(), expectedSuffix) {
-		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
-	}
-
-	if res.StatusCode != 404 {
-		t.Fatalf("was expecting status 404 but got %d", res.StatusCode)
-	}
+	ensure.Err(t, err, regexp.MustCompile(`failed with code 803`))
+	ensure.DeepEqual(t, res.StatusCode, 404)
 }
 
 func TestRelativeToBaseURL(t *testing.T) {
@@ -167,24 +116,8 @@ func TestRelativeToBaseURL(t *testing.T) {
 		&http.Request{Method: "GET", URL: &url.URL{Path: "0"}},
 		nil,
 	)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-
-	const expectedPrefix = `GET ` +
-		`https://graph.facebook.com/20aa2519-4745-4522-92a9-4522b8edf6e9/0`
-	const expectedSuffix = `failed with code 803 type OAuthException message (#803) ` +
-		`Some of the aliases you requested do not exist: ` +
-		`20aa2519-4745-4522-92a9-4522b8edf6e9`
-
-	if !strings.HasPrefix(err.Error(), expectedPrefix) ||
-		!strings.HasSuffix(err.Error(), expectedSuffix) {
-		t.Fatalf(`expected "%s.*%s" got "%s"`, expectedPrefix, expectedSuffix, err)
-	}
-
-	if res.StatusCode != 404 {
-		t.Fatalf("was expecting status 404 but got %d", res.StatusCode)
-	}
+	ensure.Err(t, err, regexp.MustCompile(`failed with code 803`))
+	ensure.DeepEqual(t, res.StatusCode, 404)
 }
 
 func TestPublicGetDiscardBody(t *testing.T) {
@@ -198,12 +131,8 @@ func TestPublicGetDiscardBody(t *testing.T) {
 		},
 		nil,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.StatusCode != 200 {
-		t.Fatalf("was expecting status 200 but got %d", res.StatusCode)
-	}
+	ensure.Nil(t, err)
+	ensure.DeepEqual(t, res.StatusCode, 200)
 }
 
 func TestServerAbort(t *testing.T) {
@@ -220,9 +149,7 @@ func TestServerAbort(t *testing.T) {
 		)
 
 		u, err := url.Parse(server.URL)
-		if err != nil {
-			t.Fatal(err)
-		}
+		ensure.Nil(t, err)
 
 		c := &fbapi.Client{
 			Transport: defaultHTTPTransport,
@@ -230,17 +157,8 @@ func TestServerAbort(t *testing.T) {
 		}
 		res := make(map[string]interface{})
 		_, err = c.Do(&http.Request{Method: "GET"}, res)
-		if err == nil {
-			t.Fatalf("was expecting an error instead got %v", res)
-		}
-		expected := fmt.Sprintf(`GET %s`, server.URL)
-		if !strings.Contains(err.Error(), expected) {
-			t.Fatalf(
-				`did not contain expected error "%s" instead got "%s"`,
-				expected,
-				err,
-			)
-		}
+		ensure.NotNil(t, err)
+		ensure.StringContains(t, err.Error(), fmt.Sprintf(`GET %s`, server.URL))
 		server.CloseClientConnections()
 		server.Close()
 	}
@@ -258,9 +176,7 @@ func TestHTMLResponse(t *testing.T) {
 	)
 
 	u, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ensure.Nil(t, err)
 
 	c := &fbapi.Client{
 		Transport: defaultHTTPTransport,
@@ -268,21 +184,7 @@ func TestHTMLResponse(t *testing.T) {
 	}
 	res := make(map[string]interface{})
 	_, err = c.Do(&http.Request{Method: "GET"}, res)
-	if err == nil {
-		t.Fatalf("was expecting an error instead got %v", res)
-	}
-	expected := fmt.Sprintf(
-		`GET %s got 500 Internal Server Error failed with invalid character '<' `+
-			`looking for beginning of value`,
-		server.URL,
-	)
-	if err.Error() != expected {
-		t.Fatalf(
-			`did not contain expected error "%s" instead got "%s"`,
-			expected,
-			err,
-		)
-	}
+	ensure.Err(t, err, regexp.MustCompile(`got 500 Internal Server Error`))
 	server.CloseClientConnections()
 	server.Close()
 }
@@ -300,15 +202,5 @@ func TestTransportError(t *testing.T) {
 	}
 	res := make(map[string]interface{})
 	_, err := c.Do(&http.Request{Method: "GET"}, res)
-	if err == nil {
-		t.Fatalf("was expecting an error instead got %v", res)
-	}
-	const expected = "42"
-	if err.Error() != expected {
-		t.Fatalf(
-			`did not contain expected error "%s" instead got "%s"`,
-			expected,
-			err,
-		)
-	}
+	ensure.Err(t, err, regexp.MustCompile(`42`))
 }
