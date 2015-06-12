@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/facebookgo/ensure"
 	"github.com/facebookgo/fbapi"
 	"github.com/facebookgo/fbapi/fbbatch"
 	"github.com/facebookgo/fbapp"
 	"github.com/facebookgo/httpcontrol"
-	"github.com/facebookgo/subset"
 )
 
 var (
-	defaultHTTPTransport = &httpcontrol.Transport{
+	defaultHttpTransport = &httpcontrol.Transport{
 		MaxIdleConnsPerHost:   50,
 		DialTimeout:           3 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
@@ -38,7 +38,7 @@ var (
 )
 
 type user struct {
-	Username string `json:"username"`
+	Name string `json:"name"`
 }
 
 func accessToken() string {
@@ -47,7 +47,7 @@ func accessToken() string {
 
 func init() {
 	flag.Parse()
-	defaultFbClient.Transport = defaultHTTPTransport
+	defaultFbClient.Transport = defaultHttpTransport
 
 	// default app for testing
 	if defaultApp.ID() == 0 {
@@ -96,11 +96,11 @@ func TestBatchGets(t *testing.T) {
 	b := &fbbatch.Batch{
 		AccessToken: accessToken(),
 		Request: []*fbbatch.Request{
-			&fbbatch.Request{
-				RelativeURL: "/naitik?fields=first_name",
+			{
+				RelativeURL: "/facebook?fields=name",
 			},
-			&fbbatch.Request{
-				RelativeURL: "/shwetanshah?fields=first_name",
+			{
+				RelativeURL: "/microsoft?fields=name",
 			},
 		},
 	}
@@ -115,18 +115,16 @@ func TestBatchGets(t *testing.T) {
 	}
 
 	expected := []*fbbatch.Response{
-		&fbbatch.Response{
+		{
 			Code: 200,
-			Body: `{"first_name":"Naitik","id":"5526183"}`,
+			Body: `{"name":"Facebook","id":"20531316728"}`,
 		},
-		&fbbatch.Response{
+		{
 			Code: 200,
-			Body: `{"first_name":"Shweta","id":"61302481"}`,
+			Body: `{"name":"Microsoft","id":"20528438720"}`,
 		},
 	}
-	if !subset.Check(expected, r) {
-		t.Fatal("did not find expected subset")
-	}
+	ensure.Subset(t, r, expected)
 }
 
 func TestPublicGet(t *testing.T) {
@@ -136,20 +134,14 @@ func TestPublicGet(t *testing.T) {
 		&http.Request{
 			Method: "GET",
 			URL: &url.URL{
-				Path: "5526183",
+				Path: "20531316728",
 			},
 		},
 		&u,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.StatusCode != 200 {
-		t.Fatalf("was expecting status 200 but got %d", res.StatusCode)
-	}
-	if u.Username != "naitik" {
-		t.Fatalf("was expecting naitik but got %s", u.Username)
-	}
+	ensure.Nil(t, err)
+	ensure.DeepEqual(t, res.StatusCode, 200)
+	ensure.DeepEqual(t, u.Name, "Facebook")
 }
 
 func TestMaxBatchSize(t *testing.T) {
@@ -165,7 +157,7 @@ func TestMaxBatchSize(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < c.MaxBatchSize; i++ {
+	for i := uint(0); i < c.MaxBatchSize; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -174,20 +166,14 @@ func TestMaxBatchSize(t *testing.T) {
 				&http.Request{
 					Method: "GET",
 					URL: &url.URL{
-						Path: "5526183",
+						Path: "20531316728",
 					},
 				},
 				&u,
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if res.StatusCode != 200 {
-				t.Fatalf("was expecting status 200 but got %d", res.StatusCode)
-			}
-			if u.Username != "naitik" {
-				t.Fatalf("was expecting naitik but got %s", u.Username)
-			}
+			ensure.Nil(t, err)
+			ensure.DeepEqual(t, res.StatusCode, 200)
+			ensure.DeepEqual(t, u.Name, "Facebook")
 		}()
 	}
 	wg.Wait()

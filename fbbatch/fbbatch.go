@@ -18,13 +18,21 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/facebookgo/fbapi"
+	"github.com/facebookgo/muster"
 )
 
 var (
+	// DefaultPendingWorkCapacity configures the default capacity after which a
+	// enqueuing new work will block.
+	DefaultPendingWorkCapacity = flag.Uint(
+		"fbbatch.pending_work_capacity",
+		1000,
+		"default pending work capacity",
+	)
+
 	// DefaultBatchTimeout configures the default timeout after which a batch
 	// will be fired.
 	DefaultBatchTimeout = flag.Duration(
@@ -34,7 +42,7 @@ var (
 	)
 
 	// DefaultMaxBatchSize configures the default maximum batch size.
-	DefaultMaxBatchSize = flag.Int(
+	DefaultMaxBatchSize = flag.Uint(
 		"fbbatch.max_batch_size",
 		50,
 		"default max batch size",
@@ -155,82 +163,27 @@ type workRequest struct {
 	Response chan *workResponse
 }
 
-// Client with the same interface as fbapi.Client but one where the underlying
-// requests are automatically batched together.
-type Client struct {
-	Client       *fbapi.Client
-	AccessToken  string
-	AppID        uint64
-	MaxBatchSize int
-	BatchTimeout time.Duration
-	work         chan *workRequest
-	workGroup    sync.WaitGroup
+type musterBatch struct {
+	Client       *Client
+	WorkRequests []*workRequest
 }
 
-// Start the background worker to aggregate and Batch Requests.
-func (c *Client) Start() error {
-	if int64(c.BatchTimeout) == 0 {
-		c.BatchTimeout = *DefaultBatchTimeout
-	}
-	if c.MaxBatchSize == 0 {
-		c.MaxBatchSize = *DefaultMaxBatchSize
-	}
-
-	c.work = make(chan *workRequest)
-	go c.worker()
-	return nil
+func (m *musterBatch) Add(v interface{}) {
+	m.WorkRequests = append(m.WorkRequests, v.(*workRequest))
 }
 
-// Stop and gracefully wait for the background worker to finish processing
-// pending requests.
-func (c *Client) Stop() error {
-	close(c.work)
-	c.workGroup.Wait()
-	return nil
-}
-
-func (c *Client) worker() {
-	var batchTimeout <-chan time.Time
-	var batch []*workRequest
-	for {
-		select {
-		case <-batchTimeout:
-			c.workGroup.Add(1)
-			go c.send(batch)
-			batch = nil
-			batchTimeout = nil
-		case rr, open := <-c.work:
-			if !open {
-				c.workGroup.Add(1)
-				c.send(batch)
-				return
-			}
-			batch = append(batch, rr)
-			if batchTimeout == nil {
-				batchTimeout = time.After(c.BatchTimeout)
-			}
-			if len(batch) >= c.MaxBatchSize {
-				c.workGroup.Add(1)
-				go c.send(batch)
-				batch = nil
-				batchTimeout = nil
-			}
-		}
-	}
-}
-
-func (c *Client) send(rrs []*workRequest) {
-	defer c.workGroup.Done()
+func (m *musterBatch) Fire(notifier muster.Notifier) {
+	defer notifier.Done()
 	b := &Batch{
-		AccessToken: c.AccessToken,
-		AppID:       c.AppID,
-		Request:     make([]*Request, len(rrs)),
+		AccessToken: m.Client.AccessToken,
+		AppID:       m.Client.AppID,
+		Request:     make([]*Request, len(m.WorkRequests)),
 	}
-	for i, rr := range rrs {
+	for i, rr := range m.WorkRequests {
 		b.Request[i] = rr.Request
 	}
-	res, err := BatchDo(c.Client, b)
-	for i, rr := range rrs {
+	res, err := BatchDo(m.Client.Client, b)
+	for i, rr := range m.WorkRequests {
 		if err == nil {
 			rr.Response <- &workResponse{Response: res[i]}
 		} else {
@@ -239,11 +192,58 @@ func (c *Client) send(rrs []*workRequest) {
 	}
 }
 
+// Client with the same interface as fbapi.Client but one where the underlying
+// requests are automatically batched together.
+type Client struct {
+	Client      *fbapi.Client
+	AccessToken string
+	AppID       uint64
+
+	// Capacity of log channel. Defaults to DefaultPendingWorkCapacity.
+	PendingWorkCapacity uint
+
+	// Maximum number of items in a batch. Defaults to DefaultMaxBatchSize.
+	MaxBatchSize uint
+
+	// Amount of time after which to send a pending batch. Defaults to
+	// DefaultBatchTimeout.
+	BatchTimeout time.Duration
+
+	muster muster.Client
+}
+
+// Start the background worker to aggregate and Batch Requests.
+func (c *Client) Start() error {
+	if c.PendingWorkCapacity == 0 {
+		c.PendingWorkCapacity = *DefaultPendingWorkCapacity
+	}
+	if c.MaxBatchSize == 0 {
+		c.MaxBatchSize = *DefaultMaxBatchSize
+	}
+	if int64(c.BatchTimeout) == 0 {
+		c.BatchTimeout = *DefaultBatchTimeout
+	}
+
+	c.muster.BatchMaker = func() muster.Batch {
+		return &musterBatch{Client: c}
+	}
+	c.muster.BatchTimeout = c.BatchTimeout
+	c.muster.MaxBatchSize = c.MaxBatchSize
+	c.muster.PendingWorkCapacity = c.PendingWorkCapacity
+	return c.muster.Start()
+}
+
+// Stop and gracefully wait for the background worker to finish processing
+// pending requests.
+func (c *Client) Stop() error {
+	return c.muster.Stop()
+}
+
 // Do performs a Graph API request and unmarshal it's response. If the response
 // is an error, it will be returned as an error, else it will be unmarshalled
 // into the result.
 func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, error) {
-	if c.work == nil {
+	if c.muster.Work == nil {
 		return nil, errNotStarted
 	}
 
@@ -253,7 +253,7 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 	}
 
 	wrc := make(chan *workResponse)
-	c.work <- &workRequest{Request: breq, Response: wrc}
+	c.muster.Work <- &workRequest{Request: breq, Response: wrc}
 	wr := <-wrc
 	if wr.Error != nil {
 		return nil, wr.Error

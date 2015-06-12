@@ -57,14 +57,14 @@ func TestPublicGet(t *testing.T) {
 		&http.Request{
 			Method: "GET",
 			URL: &url.URL{
-				Path: "5526183",
+				Path: "127031120644257",
 			},
 		},
 		&user,
 	)
 	ensure.Nil(t, err)
 	ensure.DeepEqual(t, res.StatusCode, 200)
-	ensure.DeepEqual(t, user.Username, "naitik")
+	ensure.DeepEqual(t, user.Username, "DoctorWho")
 }
 
 func TestInvalidGet(t *testing.T) {
