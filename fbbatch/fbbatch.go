@@ -261,7 +261,7 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 	hres, err := wr.Response.httpResponse()
 	hres.Request = req
 
-	if err := fbapi.UnmarshalResponse(hres, c.Client.Redactor(), result); err != nil {
+	if err := fbapi.UnmarshalResponse(hres, result); err != nil {
 		return hres, err
 	}
 	return hres, nil

@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	defaultFbClient    = &fbapi.Client{Redact: true}
+	defaultFbClient    = &fbapi.Client{}
 	defaultBatchClient = &fbbatch.Client{
 		Client:      defaultFbClient,
 		AccessToken: "161808054014511|e82319ae149d25b14217f9a34064b173",

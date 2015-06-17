@@ -2,26 +2,16 @@
 package fbapi
 
 import (
+	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"regexp"
-	"strings"
-
-	"github.com/facebookgo/httperr"
 )
 
-var redactor = httperr.RedactRegexp(
-	regexp.MustCompile("(access_token|client_secret)=([^&]*)"),
-	"$1=-- XX -- REDACTED -- XX --",
-)
-
-// The default base URL for the API.
-var DefaultBaseURL = &url.URL{
+var defaultBaseURL = &url.URL{
 	Scheme: "https",
 	Host:   "graph.facebook.com",
 	Path:   "/",
@@ -33,34 +23,21 @@ type Error struct {
 	Message string `json:"message"`
 	Type    string `json:"type"`
 	Code    int    `json:"code"`
-
-	request  *http.Request
-	response *http.Response
-	redactor httperr.Redactor
 }
 
 func (e *Error) Error() string {
-	var parts []string
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "fbapi: error")
 	if e.Code != 0 {
-		parts = append(parts, fmt.Sprintf("code %d", e.Code))
+		fmt.Fprintf(&b, " code=%d", e.Code)
 	}
 	if e.Type != "" {
-		parts = append(parts, fmt.Sprintf("type %s", e.Type))
+		fmt.Fprintf(&b, " type=%q", e.Type)
 	}
 	if e.Message != "" {
-		parts = append(parts, fmt.Sprintf("message %s", e.Message))
+		fmt.Fprintf(&b, " message=%q", e.Message)
 	}
-	return httperr.NewError(
-		errors.New(strings.Join(parts, " ")),
-		e.redactor,
-		e.request,
-		e.response,
-	).Error()
-}
-
-// Wrapper for "error" returned from Facebook APIs.
-type errorResponse struct {
-	Error Error `json:"error"`
+	return b.String()
 }
 
 // Client for the Facebook API.
@@ -70,11 +47,9 @@ type Client struct {
 	Transport http.RoundTripper `inject:""`
 
 	// The base URL to parse relative URLs off. If you pass absolute URLs to Client
-	// functions they are used as-is. When nil DefaultBaseURL will be used.
+	// functions they are used as-is. When nil https://graph.facebook.com/ will
+	// be used.
 	BaseURL *url.URL
-
-	// Redact sensitive information from errors when true.
-	Redact bool
 }
 
 func (c *Client) transport() http.RoundTripper {
@@ -94,14 +69,14 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 
 	if req.URL == nil {
 		if c.BaseURL == nil {
-			req.URL = DefaultBaseURL
+			req.URL = defaultBaseURL
 		} else {
 			req.URL = c.BaseURL
 		}
 	} else {
 		if !req.URL.IsAbs() {
 			if c.BaseURL == nil {
-				req.URL = DefaultBaseURL.ResolveReference(req.URL)
+				req.URL = defaultBaseURL.ResolveReference(req.URL)
 			} else {
 				req.URL = c.BaseURL.ResolveReference(req.URL)
 			}
@@ -118,46 +93,32 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 
 	res, err := c.transport().RoundTrip(req)
 	if err != nil {
-		return nil, httperr.RedactError(err, c.Redactor())
+		return nil, err
 	}
 
-	if err := UnmarshalResponse(res, c.Redactor(), result); err != nil {
+	if err := UnmarshalResponse(res, result); err != nil {
 		return res, err
 	}
 	return res, nil
 }
 
-// Redactor provides a httperr.Redactor to strip the fbapi related sensitive
-// information from error messages, for example the access_token.
-func (c *Client) Redactor() httperr.Redactor {
-	if !c.Redact {
-		return httperr.RedactNoOp()
-	}
-	return redactor
-}
-
 // UnmarshalResponse will unmarshal a http.Response from a Facebook API request
 // into result, possibly returning an error if the process fails or if the API
 // returned an error.
-func UnmarshalResponse(res *http.Response, redactor httperr.Redactor, result interface{}) error {
+func UnmarshalResponse(res *http.Response, result interface{}) error {
 	defer res.Body.Close()
 
 	if res.StatusCode > 399 || res.StatusCode < 200 {
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return httperr.NewError(err, redactor, res.Request, res)
+			return err
 		}
 
-		apiErrorResponse := &errorResponse{
-			Error: Error{
-				request:  res.Request,
-				response: res,
-				redactor: redactor,
-			},
+		var apiErrorResponse struct {
+			Error Error `json:"error"`
 		}
-		err = json.Unmarshal(body, apiErrorResponse)
-		if err != nil {
-			return httperr.NewError(err, redactor, res.Request, res)
+		if err := json.Unmarshal(body, &apiErrorResponse); err != nil {
+			return err
 		}
 		return &apiErrorResponse.Error
 	}
@@ -169,7 +130,7 @@ func UnmarshalResponse(res *http.Response, redactor httperr.Redactor, result int
 		err = json.NewDecoder(res.Body).Decode(result)
 	}
 	if err != nil {
-		return httperr.NewError(err, redactor, res.Request, res)
+		return err
 	}
 	return nil
 }

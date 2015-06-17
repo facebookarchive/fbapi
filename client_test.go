@@ -3,7 +3,6 @@ package fbapi_test
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,7 +13,7 @@ import (
 	"github.com/facebookgo/fbapi"
 )
 
-var defaultFbClient = &fbapi.Client{Redact: true}
+var defaultFbClient = &fbapi.Client{}
 
 func TestPublicGet(t *testing.T) {
 	t.Parallel()
@@ -46,14 +45,14 @@ func TestInvalidGet(t *testing.T) {
 		},
 		nil,
 	)
-	ensure.Err(t, err, regexp.MustCompile(`failed with code 803`))
+	ensure.Err(t, err, regexp.MustCompile("code=803"))
 	ensure.DeepEqual(t, res.StatusCode, 404)
 }
 
 func TestNilURLWithDefaultBaseURL(t *testing.T) {
 	t.Parallel()
 	res, err := defaultFbClient.Do(&http.Request{Method: "GET"}, nil)
-	ensure.Err(t, err, regexp.MustCompile(`failed with code 100`))
+	ensure.Err(t, err, regexp.MustCompile("code=100"))
 	ensure.DeepEqual(t, res.StatusCode, 400)
 }
 
@@ -67,7 +66,7 @@ func TestNilURLWithBaseURL(t *testing.T) {
 		},
 	}
 	res, err := client.Do(&http.Request{Method: "GET"}, nil)
-	ensure.Err(t, err, regexp.MustCompile(`failed with code 803`))
+	ensure.Err(t, err, regexp.MustCompile("code=803"))
 	ensure.DeepEqual(t, res.StatusCode, 404)
 }
 
@@ -84,7 +83,7 @@ func TestRelativeToBaseURL(t *testing.T) {
 		&http.Request{Method: "GET", URL: &url.URL{Path: "0"}},
 		nil,
 	)
-	ensure.Err(t, err, regexp.MustCompile(`failed with code 803`))
+	ensure.Err(t, err, regexp.MustCompile("code=803"))
 	ensure.DeepEqual(t, res.StatusCode, 404)
 }
 
@@ -125,7 +124,7 @@ func TestServerAbort(t *testing.T) {
 		res := make(map[string]interface{})
 		_, err = c.Do(&http.Request{Method: "GET"}, res)
 		ensure.NotNil(t, err)
-		ensure.StringContains(t, err.Error(), fmt.Sprintf(`GET %s`, server.URL))
+		ensure.Err(t, err, regexp.MustCompile("(invalid character|EOF)"))
 		server.CloseClientConnections()
 		server.Close()
 	}
@@ -150,7 +149,7 @@ func TestHTMLResponse(t *testing.T) {
 	}
 	res := make(map[string]interface{})
 	_, err = c.Do(&http.Request{Method: "GET"}, res)
-	ensure.Err(t, err, regexp.MustCompile(`got 500 Internal Server Error`))
+	ensure.Err(t, err, regexp.MustCompile("invalid character"))
 	server.CloseClientConnections()
 	server.Close()
 }
@@ -168,5 +167,5 @@ func TestTransportError(t *testing.T) {
 	}
 	res := make(map[string]interface{})
 	_, err := c.Do(&http.Request{Method: "GET"}, res)
-	ensure.Err(t, err, regexp.MustCompile(`42`))
+	ensure.Err(t, err, regexp.MustCompile("42"))
 }
