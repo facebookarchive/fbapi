@@ -3,50 +3,18 @@ package fbapi_test
 import (
 	"bytes"
 	"errors"
-	"flag"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"testing"
-	"time"
 
 	"github.com/facebookgo/ensure"
 	"github.com/facebookgo/fbapi"
-	"github.com/facebookgo/flagconfig"
-	"github.com/facebookgo/httpcontrol"
 )
 
-var (
-	defaultHTTPTransport = &httpcontrol.Transport{
-		MaxIdleConnsPerHost:   50,
-		DialTimeout:           3 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		RequestTimeout:        time.Minute,
-		Stats:                 logRequestHandler,
-	}
-	defaultFbClient = fbapi.ClientFlag("fbapi-test")
-
-	logRequest = flag.Bool(
-		"log-requests",
-		false,
-		"will trigger verbose logging of requests",
-	)
-)
-
-func init() {
-	flag.Usage = flagconfig.Usage
-	flagconfig.Parse()
-	defaultFbClient.Transport = defaultHTTPTransport
-}
-
-func logRequestHandler(stats *httpcontrol.Stats) {
-	if *logRequest {
-		fmt.Println(stats.String())
-		fmt.Println("Header", stats.Request.Header)
-	}
-}
+var defaultFbClient = &fbapi.Client{Redact: true}
 
 func TestPublicGet(t *testing.T) {
 	t.Parallel()
@@ -126,7 +94,7 @@ func TestPublicGetDiscardBody(t *testing.T) {
 		&http.Request{
 			Method: "GET",
 			URL: &url.URL{
-				Path: "5526183",
+				Path: "20531316728",
 			},
 		},
 		nil,
@@ -152,8 +120,7 @@ func TestServerAbort(t *testing.T) {
 		ensure.Nil(t, err)
 
 		c := &fbapi.Client{
-			Transport: defaultHTTPTransport,
-			BaseURL:   u,
+			BaseURL: u,
 		}
 		res := make(map[string]interface{})
 		_, err = c.Do(&http.Request{Method: "GET"}, res)
@@ -179,8 +146,7 @@ func TestHTMLResponse(t *testing.T) {
 	ensure.Nil(t, err)
 
 	c := &fbapi.Client{
-		Transport: defaultHTTPTransport,
-		BaseURL:   u,
+		BaseURL: u,
 	}
 	res := make(map[string]interface{})
 	_, err = c.Do(&http.Request{Method: "GET"}, res)

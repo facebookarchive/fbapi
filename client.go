@@ -4,7 +4,6 @@ package fbapi
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -76,18 +75,6 @@ type Client struct {
 
 	// Redact sensitive information from errors when true.
 	Redact bool
-}
-
-// ClientFlag returns a Facebook API Client configured using flags.
-func ClientFlag(name string) *Client {
-	c := &Client{}
-	flag.BoolVar(
-		&c.Redact,
-		name+".redact",
-		true,
-		name+" redact known sensitive information from errors",
-	)
-	return c
 }
 
 func (c *Client) transport() http.RoundTripper {

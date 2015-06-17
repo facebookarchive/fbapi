@@ -1,8 +1,6 @@
 package fbbatch_test
 
 import (
-	"flag"
-	"fmt"
 	"net/http"
 	"net/url"
 	"sync"
@@ -12,62 +10,23 @@ import (
 	"github.com/facebookgo/ensure"
 	"github.com/facebookgo/fbapi"
 	"github.com/facebookgo/fbapi/fbbatch"
-	"github.com/facebookgo/fbapp"
-	"github.com/facebookgo/httpcontrol"
 )
 
 var (
-	defaultHttpTransport = &httpcontrol.Transport{
-		MaxIdleConnsPerHost:   50,
-		DialTimeout:           3 * time.Second,
-		ResponseHeaderTimeout: 30 * time.Second,
-		RequestTimeout:        time.Minute,
-		Stats:                 logRequestHandler,
-	}
-	defaultFbClient    = fbapi.ClientFlag("fbapi-test")
-	defaultApp         = fbapp.Flag("fbapp-test")
+	defaultFbClient    = &fbapi.Client{Redact: true}
 	defaultBatchClient = &fbbatch.Client{
-		Client: defaultFbClient,
+		Client:      defaultFbClient,
+		AccessToken: "161808054014511|e82319ae149d25b14217f9a34064b173",
 	}
-
-	logRequest = flag.Bool(
-		"log-requests",
-		false,
-		"will trigger verbose logging of requests",
-	)
 )
 
 type user struct {
 	Name string `json:"name"`
 }
 
-func accessToken() string {
-	return fmt.Sprintf("%d|%s", defaultApp.ID(), defaultApp.Secret())
-}
-
 func init() {
-	flag.Parse()
-	defaultFbClient.Transport = defaultHttpTransport
-
-	// default app for testing
-	if defaultApp.ID() == 0 {
-		defaultApp = fbapp.New(
-			161808054014511,
-			"e82319ae149d25b14217f9a34064b173",
-			"gofbapi",
-		)
-	}
-
 	if err := defaultBatchClient.Start(); err != nil {
 		panic(err)
-	}
-	defaultBatchClient.AccessToken = accessToken()
-}
-
-func logRequestHandler(stats *httpcontrol.Stats) {
-	if *logRequest {
-		fmt.Println(stats.String())
-		fmt.Println("Header", stats.Request.Header)
 	}
 }
 
@@ -94,7 +53,7 @@ func TestNotStarted(t *testing.T) {
 
 func TestBatchGets(t *testing.T) {
 	b := &fbbatch.Batch{
-		AccessToken: accessToken(),
+		AccessToken: defaultBatchClient.AccessToken,
 		Request: []*fbbatch.Request{
 			{
 				RelativeURL: "/facebook?fields=name",
@@ -147,7 +106,7 @@ func TestPublicGet(t *testing.T) {
 func TestMaxBatchSize(t *testing.T) {
 	t.Parallel()
 	c := &fbbatch.Client{
-		AccessToken:  accessToken(),
+		AccessToken:  defaultBatchClient.AccessToken,
 		Client:       defaultFbClient,
 		BatchTimeout: time.Second,
 		MaxBatchSize: 2,
@@ -182,7 +141,7 @@ func TestMaxBatchSize(t *testing.T) {
 func TestStopClient(t *testing.T) {
 	t.Parallel()
 	c := &fbbatch.Client{
-		AccessToken:  accessToken(),
+		AccessToken:  defaultBatchClient.AccessToken,
 		Client:       defaultFbClient,
 		BatchTimeout: time.Second,
 	}
