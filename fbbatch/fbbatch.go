@@ -11,44 +11,22 @@ package fbbatch
 
 import (
 	"encoding/json"
-	"errors"
-	"flag"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/facebookgo/fbapi"
 	"github.com/facebookgo/muster"
 )
 
-var (
-	// DefaultPendingWorkCapacity configures the default capacity after which a
-	// enqueuing new work will block.
-	DefaultPendingWorkCapacity = flag.Uint(
-		"fbbatch.pending_work_capacity",
-		1000,
-		"default pending work capacity",
-	)
-
-	// DefaultBatchTimeout configures the default timeout after which a batch
-	// will be fired.
-	DefaultBatchTimeout = flag.Duration(
-		"fbbatch.batch_timeout",
-		time.Millisecond*10,
-		"default batch timeout",
-	)
-
-	// DefaultMaxBatchSize configures the default maximum batch size.
-	DefaultMaxBatchSize = flag.Uint(
-		"fbbatch.max_batch_size",
-		50,
-		"default max batch size",
-	)
-
-	errNotStarted = errors.New("fbbatch: client not started")
+const (
+	defaultPendingWorkCapacity = 1000
+	defaultBatchTimeout        = time.Millisecond * 10
+	defaultMaxBatchSize        = 50
 )
 
 // Request in a Batch.
@@ -199,43 +177,51 @@ type Client struct {
 	AccessToken string
 	AppID       uint64
 
-	// Capacity of log channel. Defaults to DefaultPendingWorkCapacity.
+	// Capacity of log channel. Defaults to 1000.
 	PendingWorkCapacity uint
 
-	// Maximum number of items in a batch. Defaults to DefaultMaxBatchSize.
+	// Maximum number of items in a batch. Defaults to 50.
 	MaxBatchSize uint
 
-	// Amount of time after which to send a pending batch. Defaults to
-	// DefaultBatchTimeout.
+	// Amount of time after which to send a pending batch. Defaults to 10ms.
 	BatchTimeout time.Duration
 
-	muster muster.Client
+	startOnce sync.Once
+	startErr  error
+	muster    muster.Client
 }
 
 // Start the background worker to aggregate and Batch Requests.
-func (c *Client) Start() error {
-	if c.PendingWorkCapacity == 0 {
-		c.PendingWorkCapacity = *DefaultPendingWorkCapacity
-	}
-	if c.MaxBatchSize == 0 {
-		c.MaxBatchSize = *DefaultMaxBatchSize
-	}
-	if int64(c.BatchTimeout) == 0 {
-		c.BatchTimeout = *DefaultBatchTimeout
-	}
+func (c *Client) start() error {
+	c.startOnce.Do(func() {
+		pendingWorkCapacity := c.PendingWorkCapacity
+		if pendingWorkCapacity == 0 {
+			pendingWorkCapacity = defaultPendingWorkCapacity
+		}
+		maxBatchSize := c.MaxBatchSize
+		if maxBatchSize == 0 {
+			maxBatchSize = defaultMaxBatchSize
+		}
+		batchTimeout := c.BatchTimeout
+		if int64(batchTimeout) == 0 {
+			batchTimeout = defaultBatchTimeout
+		}
 
-	c.muster.BatchMaker = func() muster.Batch {
-		return &musterBatch{Client: c}
-	}
-	c.muster.BatchTimeout = c.BatchTimeout
-	c.muster.MaxBatchSize = c.MaxBatchSize
-	c.muster.PendingWorkCapacity = c.PendingWorkCapacity
-	return c.muster.Start()
+		c.muster.BatchMaker = func() muster.Batch { return &musterBatch{Client: c} }
+		c.muster.BatchTimeout = batchTimeout
+		c.muster.MaxBatchSize = maxBatchSize
+		c.muster.PendingWorkCapacity = pendingWorkCapacity
+		c.startErr = c.muster.Start()
+	})
+	return c.startErr
 }
 
 // Stop and gracefully wait for the background worker to finish processing
 // pending requests.
 func (c *Client) Stop() error {
+	if err := c.start(); err != nil {
+		return err
+	}
 	return c.muster.Stop()
 }
 
@@ -243,8 +229,8 @@ func (c *Client) Stop() error {
 // is an error, it will be returned as an error, else it will be unmarshalled
 // into the result.
 func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, error) {
-	if c.muster.Work == nil {
-		return nil, errNotStarted
+	if err := c.start(); err != nil {
+		return nil, err
 	}
 
 	breq, err := newRequest(req)

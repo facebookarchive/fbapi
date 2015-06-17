@@ -15,10 +15,6 @@ func Example() {
 		Client: &fbapi.Client{},
 		AppID:  161808054014511,
 	}
-	if err := client.Start(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
 	defer client.Stop()
 
 	var show struct {

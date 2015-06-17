@@ -24,33 +24,6 @@ type user struct {
 	Name string `json:"name"`
 }
 
-func init() {
-	if err := defaultBatchClient.Start(); err != nil {
-		panic(err)
-	}
-}
-
-func TestNotStarted(t *testing.T) {
-	t.Parallel()
-	c := &fbbatch.Client{}
-
-	_, err := c.Do(
-		&http.Request{
-			Method: "GET",
-			URL: &url.URL{
-				Path: "5526183",
-			},
-		},
-		nil,
-	)
-	if err == nil {
-		t.Fatal("was expecting error")
-	}
-	if err.Error() != "fbbatch: client not started" {
-		t.Fatalf("did not get expected error, got %s", err)
-	}
-}
-
 func TestBatchGets(t *testing.T) {
 	b := &fbbatch.Batch{
 		AccessToken: defaultBatchClient.AccessToken,
@@ -111,9 +84,6 @@ func TestMaxBatchSize(t *testing.T) {
 		BatchTimeout: time.Second,
 		MaxBatchSize: 2,
 	}
-	if err := c.Start(); err != nil {
-		t.Fatal(err)
-	}
 
 	var wg sync.WaitGroup
 	for i := uint(0); i < c.MaxBatchSize; i++ {
@@ -144,9 +114,6 @@ func TestStopClient(t *testing.T) {
 		AccessToken:  defaultBatchClient.AccessToken,
 		Client:       defaultFbClient,
 		BatchTimeout: time.Second,
-	}
-	if err := c.Start(); err != nil {
-		t.Fatal(err)
 	}
 	if err := c.Stop(); err != nil {
 		t.Fatal(err)
