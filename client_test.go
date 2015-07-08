@@ -3,103 +3,108 @@ package fbapi_test
 import (
 	"bytes"
 	"errors"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/facebookgo/ensure"
 	"github.com/facebookgo/fbapi"
+	"github.com/facebookgo/jsonpipe"
 )
 
-var defaultFbClient = &fbapi.Client{}
+type fTransport func(*http.Request) (*http.Response, error)
 
-func TestPublicGet(t *testing.T) {
-	t.Parallel()
-	user := struct {
-		Username string `json:"username"`
-	}{}
-	res, err := defaultFbClient.Do(
-		&http.Request{
-			Method: "GET",
-			URL: &url.URL{
-				Path: "127031120644257",
-			},
-		},
-		&user,
-	)
-	ensure.Nil(t, err)
-	ensure.DeepEqual(t, res.StatusCode, 200)
-	ensure.DeepEqual(t, user.Username, "DoctorWho")
+func (f fTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	return f(r)
 }
 
-func TestInvalidGet(t *testing.T) {
-	t.Parallel()
-	res, err := defaultFbClient.Do(
-		&http.Request{
-			Method: "GET",
-			URL: &url.URL{
-				Path: "20aa2519-4745-4522-92a9-4522b8edf6e9",
-			},
-		},
-		nil,
-	)
-	ensure.Err(t, err, regexp.MustCompile("code=803"))
-	ensure.DeepEqual(t, res.StatusCode, 404)
-}
-
-func TestNilURLWithDefaultBaseURL(t *testing.T) {
-	t.Parallel()
-	res, err := defaultFbClient.Do(&http.Request{Method: "GET"}, nil)
-	ensure.Err(t, err, regexp.MustCompile("code=100"))
-	ensure.DeepEqual(t, res.StatusCode, 400)
-}
-
-func TestNilURLWithBaseURL(t *testing.T) {
-	t.Parallel()
-	client := &fbapi.Client{
-		BaseURL: &url.URL{
-			Scheme: "https",
-			Host:   "graph.facebook.com",
-			Path:   "/20aa2519-4745-4522-92a9-4522b8edf6e9",
-		},
+func TestErrorString(t *testing.T) {
+	e := fbapi.Error{
+		Message: "m",
+		Type:    "t",
+		Code:    42,
 	}
-	res, err := client.Do(&http.Request{Method: "GET"}, nil)
-	ensure.Err(t, err, regexp.MustCompile("code=803"))
-	ensure.DeepEqual(t, res.StatusCode, 404)
+	ensure.DeepEqual(t, e.Error(), `fbapi: error code=42 type="t" message="m"`)
 }
 
-func TestRelativeToBaseURL(t *testing.T) {
+func TestCustomBaseURL(t *testing.T) {
 	t.Parallel()
-	client := &fbapi.Client{
-		BaseURL: &url.URL{
-			Scheme: "https",
-			Host:   "graph.facebook.com",
-			Path:   "/20aa2519-4745-4522-92a9-4522b8edf6e9/",
-		},
+	baseURL := &url.URL{
+		Scheme: "https",
+		Host:   "example.com",
+		Path:   "/",
 	}
-	res, err := client.Do(
-		&http.Request{Method: "GET", URL: &url.URL{Path: "0"}},
-		nil,
-	)
-	ensure.Err(t, err, regexp.MustCompile("code=803"))
-	ensure.DeepEqual(t, res.StatusCode, 404)
+	givenErr := errors.New("")
+	c := &fbapi.Client{
+		BaseURL: baseURL,
+		Transport: fTransport(func(r *http.Request) (*http.Response, error) {
+			ensure.DeepEqual(t, r.URL.String(), "https://example.com/foo")
+			return nil, givenErr
+		}),
+	}
+	_, err := c.Do(&http.Request{
+		Method: "GET",
+		URL:    &url.URL{Path: "foo"},
+	}, nil)
+	ensure.True(t, err == givenErr, err)
 }
 
-func TestPublicGetDiscardBody(t *testing.T) {
+func TestDefaultBaseURL(t *testing.T) {
 	t.Parallel()
-	res, err := defaultFbClient.Do(
-		&http.Request{
-			Method: "GET",
-			URL: &url.URL{
-				Path: "20531316728",
-			},
-		},
-		nil,
-	)
+	givenErr := errors.New("")
+	c := &fbapi.Client{
+		Transport: fTransport(func(r *http.Request) (*http.Response, error) {
+			ensure.DeepEqual(t, r.URL.String(), "https://graph.facebook.com/foo")
+			return nil, givenErr
+		}),
+	}
+	_, err := c.Do(&http.Request{
+		Method: "GET",
+		URL:    &url.URL{Path: "foo"},
+	}, nil)
+	ensure.True(t, err == givenErr, err)
+}
+
+func TestValidResponse(t *testing.T) {
+	t.Parallel()
+	given := map[string]string{"answer": "42"}
+	c := &fbapi.Client{
+		Transport: fTransport(func(r *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       ioutil.NopCloser(jsonpipe.Encode(given)),
+			}, nil
+		}),
+	}
+	var actual map[string]string
+	_, err := c.Do(&http.Request{Method: "GET"}, &actual)
 	ensure.Nil(t, err)
-	ensure.DeepEqual(t, res.StatusCode, 200)
+	ensure.DeepEqual(t, actual, given)
+}
+
+func TestErrorResponse(t *testing.T) {
+	t.Parallel()
+	givenErr := &fbapi.Error{
+		Message: "message42",
+		Type:    "type42",
+		Code:    42,
+	}
+	given := map[string]interface{}{"error": givenErr}
+	c := &fbapi.Client{
+		Transport: fTransport(func(r *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Body:       ioutil.NopCloser(jsonpipe.Encode(given)),
+			}, nil
+		}),
+	}
+	var actual map[string]string
+	_, err := c.Do(&http.Request{Method: "GET"}, &actual)
+	ensure.DeepEqual(t, err, givenErr)
 }
 
 func TestServerAbort(t *testing.T) {
@@ -121,8 +126,7 @@ func TestServerAbort(t *testing.T) {
 		c := &fbapi.Client{
 			BaseURL: u,
 		}
-		res := make(map[string]interface{})
-		_, err = c.Do(&http.Request{Method: "GET"}, res)
+		_, err = c.Do(&http.Request{Method: "GET"}, nil)
 		ensure.NotNil(t, err)
 		ensure.Err(t, err, regexp.MustCompile("(invalid character|EOF)"))
 		server.CloseClientConnections()
@@ -132,40 +136,26 @@ func TestServerAbort(t *testing.T) {
 
 func TestHTMLResponse(t *testing.T) {
 	t.Parallel()
-	server := httptest.NewServer(
-		http.HandlerFunc(
-			func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(500)
-				w.Write([]byte("<html></html>"))
-			},
-		),
-	)
-
-	u, err := url.Parse(server.URL)
-	ensure.Nil(t, err)
-
 	c := &fbapi.Client{
-		BaseURL: u,
+		Transport: fTransport(func(*http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusInternalServerError,
+				Body:       ioutil.NopCloser(strings.NewReader("<html>")),
+			}, nil
+		}),
 	}
-	res := make(map[string]interface{})
-	_, err = c.Do(&http.Request{Method: "GET"}, res)
+	_, err := c.Do(&http.Request{Method: "GET"}, nil)
 	ensure.Err(t, err, regexp.MustCompile("invalid character"))
-	server.CloseClientConnections()
-	server.Close()
-}
-
-type errorTransport struct{}
-
-func (e errorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	return nil, errors.New("42")
 }
 
 func TestTransportError(t *testing.T) {
 	t.Parallel()
+	givenErr := errors.New("")
 	c := &fbapi.Client{
-		Transport: errorTransport{},
+		Transport: fTransport(func(*http.Request) (*http.Response, error) {
+			return nil, givenErr
+		}),
 	}
-	res := make(map[string]interface{})
-	_, err := c.Do(&http.Request{Method: "GET"}, res)
-	ensure.Err(t, err, regexp.MustCompile("42"))
+	_, err := c.Do(&http.Request{Method: "GET"}, nil)
+	ensure.True(t, err == givenErr)
 }

@@ -122,6 +122,7 @@ func BatchDo(c *fbapi.Client, b *Batch) ([]*Response, error) {
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
 	responses := make([]*Response, len(b.Request))
 	_, err = c.Do(req, &responses)
@@ -238,7 +239,7 @@ func (c *Client) Do(req *http.Request, result interface{}) (*http.Response, erro
 		return nil, err
 	}
 
-	wrc := make(chan *workResponse)
+	wrc := make(chan *workResponse, 1)
 	c.muster.Work <- &workRequest{Request: breq, Response: wrc}
 	wr := <-wrc
 	if wr.Error != nil {
